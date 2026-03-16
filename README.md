@@ -151,3 +151,50 @@ Edit `.env` to customize:
 - `HOURS_TO_LOOK_BACK` — how far back to scan (default: 24)
 - `CLAUDE_MODEL` — which model to use (default: claude-sonnet-4-20250514)
 - `DRY_RUN` — set to `true` to see what would be created without creating tasks
+
+---
+
+## Lead Monitor (Real-Time Sonos Alerts)
+
+A separate polling daemon that watches your inbox for emails from wedding platforms (Zola, The Knot, WeddingWire, Showit), classifies them with Claude as leads, and announces urgent ones over your Sonos speaker.
+
+### Quick Start
+
+```bash
+# Install the sonos dependency
+npm install
+
+# Test with dry run first (no Sonos needed)
+DRY_RUN=true npm run leads
+
+# Run for real
+npm run leads
+```
+
+### How It Works
+
+1. Polls Gmail every 2 minutes (configurable) for new emails from watched senders
+2. Claude classifies each email: is it a real lead or just marketing?
+3. If urgency >= threshold, announces over Sonos via TTS: *"New lead from Sarah via The Knot..."*
+4. Deduplicates — each email is only processed once per session
+
+### Lead Monitor Config
+
+Add these to your `.env`:
+
+| Variable | Default | Description |
+|---|---|---|
+| `WATCH_SENDERS` | *(required)* | Comma-separated emails/domains to watch |
+| `POLL_INTERVAL_SEC` | `120` | How often to check for new emails |
+| `LEAD_URGENCY_THRESHOLD` | `3` | Min urgency (1–5) to trigger Sonos alert |
+| `SONOS_HOST` | *(auto-discover)* | IP address of your Sonos speaker |
+| `SONOS_VOLUME` | `40` | Alert volume (0–100) |
+
+### Sonos Setup
+
+The monitor uses UPnP to talk to your Sonos speaker directly — no bridge or extra software needed.
+
+- **Auto-discover**: Leave `SONOS_HOST` blank and it finds the first speaker on your network
+- **Specific speaker**: Set `SONOS_HOST=192.168.1.xx` to target a specific room
+
+To find your Sonos IP: Open the Sonos app → Settings → System → tap the speaker → IP Address.
