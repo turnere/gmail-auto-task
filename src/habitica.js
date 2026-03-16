@@ -126,6 +126,34 @@ export async function createHabiticaTask(task) {
 }
 
 /**
+ * Get a Habitica task by ID and return its completion status.
+ * @param {string} taskId - Habitica task UUID
+ * @returns {Promise<{completed: boolean, id: string}|null>}
+ */
+export async function getHabiticaTask(taskId) {
+  const res = await fetch(`${HABITICA_BASE}/tasks/${taskId}`, {
+    headers: getHeaders(),
+  });
+
+  if (!res.ok) return null;
+
+  const { data } = await res.json();
+  return { id: data.id, completed: data.completed };
+}
+
+/**
+ * Delete a Habitica task by ID.
+ * @param {string} taskId
+ */
+export async function deleteHabiticaTask(taskId) {
+  const res = await fetch(`${HABITICA_BASE}/tasks/${taskId}`, {
+    method: 'DELETE',
+    headers: getHeaders(),
+  });
+  return res.ok;
+}
+
+/**
  * Create multiple Habitica todos, logging progress.
  * 
  * @param {Array<{title: string, notes: string, dueDate: string}>} tasks

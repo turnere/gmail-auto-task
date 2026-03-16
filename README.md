@@ -74,6 +74,8 @@ The included workflow at `.github/workflows/daily-scan.yml` runs this daily at 8
 | `ANTHROPIC_API_KEY` | Your Claude API key |
 | `HABITICA_USER_ID` | Your Habitica User ID |
 | `HABITICA_API_TOKEN` | Your Habitica API Token |
+| `SUPABASE_URL` | Your Supabase project URL |
+| `SUPABASE_SERVICE_KEY` | Your Supabase service role key |
 
 Encode files with: `base64 -w 0 credentials.json`
 
@@ -85,6 +87,56 @@ Encode files with: `base64 -w 0 credentials.json`
 4. Creates each as a Habitica todo with a reminder (9 AM on due date)
 5. Habitica sends a push notification to your phone
 6. Logs everything so you can see what was created
+
+## Contact Reconnect System
+
+Keep a database of vendors/people you want to stay connected with in **Supabase** (accessible from any frontend). Each week, the system finds who you haven't connected with the longest and creates a Habitica todo. When you complete the task in Habitica (after texting, emailing, DMing on Instagram, etc.), the next run marks them as contacted.
+
+### Supabase Setup
+
+1. Create a project at [supabase.com](https://supabase.com)
+2. Go to **SQL Editor** and run the contents of `supabase-migration.sql`
+3. Go to **Settings → API** and copy your project URL and service role key
+4. Add to your `.env`:
+   ```
+   SUPABASE_URL=https://your-project.supabase.co
+   SUPABASE_SERVICE_KEY=your-service-role-key
+   ```
+
+The same Supabase table can be accessed from your other website's frontend using the anon key + RLS policies.
+
+### Managing Contacts
+
+```bash
+# Add a contact (email is optional)
+npm run contacts:add -- "Jane Smith" "jane@example.com" "Acme Corp" "Met at trade show"
+npm run contacts:add -- "Bob Johnson" "" "Studio Pro" "Instagram DM contact"
+
+# List all contacts (sorted by least recently contacted)
+npm run contacts:list
+
+# Manually mark someone as contacted today
+npm run contacts:touched -- "jane@example.com"
+
+# Remove a contact
+npm run contacts:remove -- "jane@example.com"
+```
+
+### Weekly Reconnect
+
+```bash
+# Check completed tasks, mark contacts, create next reconnect task
+npm run reconnect
+```
+
+Each run of `npm run reconnect`:
+1. **Checks Habitica** — if you completed a reconnect task, it marks that contact as connected today
+2. **Picks the next person** — the one you haven't reached out to the longest (skips anyone who already has a pending task)
+3. **Creates a Habitica todo** — with their name, email, notes, and a due date
+
+Complete the Habitica task however you reconnected (text, email, DM, call) and the next run picks it up.
+
+Add a cron entry in GitHub Actions to run `npm run reconnect` weekly.
 
 ## Cost
 
