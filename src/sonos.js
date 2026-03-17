@@ -12,6 +12,8 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import os from 'os';
+import { flashLeadAlert } from './nanoleaf.js';
+import { createHabiticaTask } from './habitica.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -97,17 +99,40 @@ export async function playChaChing(volume) {
     });
 
     console.log('   💰 Cha-ching played ✓');
+    return true;
   } catch (err) {
     console.error('   ⚠️  Sonos cha-ching failed:', err.message);
+    return false;
   }
 }
 
 /**
- * Alert for a new lead — plays the cha-ching sound.
+ * Alert for a new lead — plays the cha-ching sound and flashes the Nanoleaf.
+ * If either fails, creates a Habitica task to investigate.
  * @param {object} lead - { summary, senderName, platform, urgency }
  */
 export async function alertLead(lead) {
   const name = lead.senderName || 'Someone';
   console.log(`🔊 New lead alert: ${name} via ${lead.platform || 'unknown'}`);
-  await playChaChing();
+
+  const [sonosOk, nanoleafOk] = await Promise.all([
+    playChaChing(),
+    flashLeadAlert(),
+  ]);
+
+  const failures = [];
+  if (!sonosOk) failures.push('Sonos');
+  if (!nanoleafOk) failures.push('Nanoleaf');
+
+  if (failures.length > 0) {
+    try {
+      await createHabiticaTask({
+        title: `🔧 Fix lead alert: ${failures.join(' & ')} failed`,
+        notes: `Alert for lead from ${name} (${lead.platform || 'unknown'}) triggered but ${failures.join(' and ')} didn't work. Check the device connections and logs.`,
+      });
+      console.log(`   📋 Habitica task created for ${failures.join(' & ')} failure`);
+    } catch (err) {
+      console.error('   ⚠️  Could not create Habitica task:', err.message);
+    }
+  }
 }
