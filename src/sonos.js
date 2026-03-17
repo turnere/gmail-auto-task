@@ -1,115 +1,113 @@
 /**
- * Sonos notification — discovers speakers and plays TTS or sound alerts.
- * Uses the 'sonos' npm package for direct UPnP control (no bridge needed).
+ * Sonos notification — discovers speakers and plays a "cha-ching" cash
+ * register sound to alert on new leads.
+ *
+ * A tiny HTTP server serves the cha-ching.mp3 file so the Sonos speaker
+ * can fetch it over the local network.
  */
 
 import { AsyncDeviceDiscovery, Sonos } from 'sonos';
+import http from 'http';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import os from 'os';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 let cachedDevice = null;
+let soundServerUrl = null;
 
-/**
- * Discover or connect to a Sonos speaker.
- * If SONOS_HOST is set, connects directly. Otherwise discovers the first speaker on the network.
- * @returns {Promise<Sonos>}
- */
+// ---------------------------------------------------------------------------
+// Local HTTP server to serve the MP3 to the Sonos speaker
+// ---------------------------------------------------------------------------
+
+function getLocalIP() {
+  const interfaces = os.networkInterfaces();
+  for (const name of Object.keys(interfaces)) {
+    for (const addr of interfaces[name]) {
+      if (!addr.internal && addr.family === 'IPv4') return addr.address;
+    }
+  }
+  return '127.0.0.1';
+}
+
+async function ensureSoundServer() {
+  if (soundServerUrl) return soundServerUrl;
+
+  const mp3Path = path.join(__dirname, 'cha-ching.mp3');
+  const mp3Buffer = fs.readFileSync(mp3Path);
+  const port = parseInt(process.env.SONOS_SOUND_PORT || '5089', 10);
+
+  return new Promise((resolve, reject) => {
+    const server = http.createServer((req, res) => {
+      console.log(`   >> Sonos fetched ${req.url} from ${req.socket.remoteAddress}`);
+      res.writeHead(200, {
+        'Content-Type': 'audio/mpeg',
+        'Content-Length': mp3Buffer.length,
+      });
+      res.end(mp3Buffer);
+    });
+
+    server.on('error', reject);
+    server.listen(port, '0.0.0.0', () => {
+      const ip = process.env.SONOS_CALLBACK_IP || getLocalIP();
+      soundServerUrl = `http://${ip}:${port}/cha-ching.mp3`;
+      console.log(`🔊 Sound server listening → ${soundServerUrl}`);
+      resolve(soundServerUrl);
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Sonos speaker helpers
+// ---------------------------------------------------------------------------
+
 async function getSpeaker() {
   if (cachedDevice) return cachedDevice;
 
   const host = process.env.SONOS_HOST;
-
   if (host) {
-    console.log(`🔊 Connecting to Sonos at ${host}...`);
+    console.log(`🔊 Connecting to Sonos at ${host}…`);
     cachedDevice = new Sonos(host);
   } else {
-    console.log('🔊 Discovering Sonos speakers on network...');
+    console.log('🔊 Discovering Sonos speakers on network…');
     const discovery = new AsyncDeviceDiscovery();
     cachedDevice = await discovery.discover();
     console.log(`   Found speaker: ${cachedDevice.host}`);
   }
-
   return cachedDevice;
 }
 
 /**
- * Set the Sonos speaker volume.
- * @param {number} volume - 0–100
+ * Play the cha-ching cash register sound on the Sonos.
+ * @param {number} [volume] - 0–100  (defaults to SONOS_VOLUME or 40)
  */
-async function ensureVolume(volume) {
-  const speaker = await getSpeaker();
-  const currentVol = await speaker.getVolume();
-  if (currentVol < volume) {
-    await speaker.setVolume(volume);
-  }
-}
+export async function playChaChing(volume) {
+  const vol = volume ?? parseInt(process.env.SONOS_VOLUME || '20', 10);
 
-/**
- * Play a TTS notification on the Sonos speaker using the built-in
- * say() method, which uses a cloud TTS service.
- * 
- * @param {string} message - Text to speak
- * @param {number} [volume=40] - Volume level (0-100)
- */
-export async function sayNotification(message, volume = 40) {
   try {
+    const uri = await ensureSoundServer();
     const speaker = await getSpeaker();
-    await ensureVolume(volume);
-
-    console.log(`🔊 Speaking: "${message}"`);
-    // The sonos library's play notification approach using a TTS URI
-    // We'll use Google TTS via the Sonos HTTP API pattern
-    const ttsUri = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=en&q=${encodeURIComponent(message)}`;
 
     await speaker.playNotification({
-      uri: ttsUri,
+      uri,
       onlyWhenPlaying: false,
-      volume,
+      volume: vol,
     });
 
-    console.log('   Notification played ✓');
+    console.log('   💰 Cha-ching played ✓');
   } catch (err) {
-    console.error('   ⚠️  Sonos TTS failed:', err.message);
-    // Fall back to just a chime/alert tone
-    await playAlertSound(volume).catch(() => {});
+    console.error('   ⚠️  Sonos cha-ching failed:', err.message);
   }
 }
 
 /**
- * Play a built-in Sonos chime/doorbell sound.
- * @param {number} [volume=40] - Volume level
- */
-export async function playAlertSound(volume = 40) {
-  try {
-    const speaker = await getSpeaker();
-    await ensureVolume(volume);
-
-    // Use a Sonos built-in chime by playing a short notification
-    await speaker.playNotification({
-      uri: 'x-rincon-buzzer:0',
-      onlyWhenPlaying: false,
-      volume,
-    });
-
-    console.log('   🔔 Alert sound played');
-  } catch (err) {
-    console.error('   ⚠️  Sonos alert sound failed:', err.message);
-  }
-}
-
-/**
- * Full lead alert: plays accent chime then speaks the lead summary.
+ * Alert for a new lead — plays the cha-ching sound.
  * @param {object} lead - { summary, senderName, platform, urgency }
  */
 export async function alertLead(lead) {
-  const volume = parseInt(process.env.SONOS_VOLUME || '40', 10);
   const name = lead.senderName || 'Someone';
-  const platform = lead.platform || 'your website';
-
-  let message;
-  if (lead.urgency >= 4) {
-    message = `Urgent new lead! ${name} from ${platform}. ${lead.summary}`;
-  } else {
-    message = `New lead from ${name} via ${platform}. ${lead.summary}`;
-  }
-
-  await sayNotification(message, volume);
+  console.log(`🔊 New lead alert: ${name} via ${lead.platform || 'unknown'}`);
+  await playChaChing();
 }
