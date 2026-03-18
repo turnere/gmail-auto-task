@@ -7,19 +7,11 @@
   "scripts": {
     "start": "node src/index.js",
     "auth": "node src/auth.js",
-    "reconnect": "node src/reconnect.js",
-    "contacts": "node src/contacts-cli.js",
-    "contacts:add": "node src/contacts-cli.js add",
-    "contacts:remove": "node src/contacts-cli.js remove",
-    "contacts:list": "node src/contacts-cli.js list",
-    "contacts:touched": "node src/contacts-cli.js touched",
-    "contacts:activity": "node src/contacts-cli.js activity",
     "leads": "node src/leadMonitor.js",
     "test": "node --test src/**/*.test.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.0",
-    "@supabase/supabase-js": "^2.99.2",
     "dotenv": "^16.4.0",
     "googleapis": "^144.0.0",
     "sonos": "^1.14.3"
