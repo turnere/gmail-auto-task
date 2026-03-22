@@ -18,10 +18,11 @@ import { createHabiticaTask } from './habitica.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 let cachedDevice = null;
-let soundServerUrl = null;
+let soundServerBase = null;
+const soundFiles = new Map();
 
 // ---------------------------------------------------------------------------
-// Local HTTP server to serve the MP3 to the Sonos speaker
+// Local HTTP server to serve MP3 files to the Sonos speaker
 // ---------------------------------------------------------------------------
 
 function getLocalIP() {
@@ -35,30 +36,43 @@ function getLocalIP() {
 }
 
 async function ensureSoundServer() {
-  if (soundServerUrl) return soundServerUrl;
+  if (soundServerBase) return soundServerBase;
 
-  const mp3Path = path.join(__dirname, 'cha-ching.mp3');
-  const mp3Buffer = fs.readFileSync(mp3Path);
   const port = parseInt(process.env.SONOS_SOUND_PORT || '5089', 10);
 
   return new Promise((resolve, reject) => {
     const server = http.createServer((req, res) => {
+      const filename = decodeURIComponent(path.basename(req.url));
+      const buffer = soundFiles.get(filename);
+      if (!buffer) {
+        res.writeHead(404);
+        res.end('Not found');
+        return;
+      }
       console.log(`   >> Sonos fetched ${req.url} from ${req.socket.remoteAddress}`);
       res.writeHead(200, {
         'Content-Type': 'audio/mpeg',
-        'Content-Length': mp3Buffer.length,
+        'Content-Length': buffer.length,
       });
-      res.end(mp3Buffer);
+      res.end(buffer);
     });
 
     server.on('error', reject);
     server.listen(port, '0.0.0.0', () => {
       const ip = process.env.SONOS_CALLBACK_IP || getLocalIP();
-      soundServerUrl = `http://${ip}:${port}/cha-ching.mp3`;
-      console.log(`🔊 Sound server listening → ${soundServerUrl}`);
-      resolve(soundServerUrl);
+      soundServerBase = `http://${ip}:${port}`;
+      console.log(`🔊 Sound server listening → ${soundServerBase}`);
+      resolve(soundServerBase);
     });
   });
+}
+
+function registerSound(mp3AbsPath) {
+  const filename = path.basename(mp3AbsPath);
+  if (!soundFiles.has(filename)) {
+    soundFiles.set(filename, fs.readFileSync(mp3AbsPath));
+  }
+  return filename;
 }
 
 // ---------------------------------------------------------------------------
@@ -82,14 +96,17 @@ async function getSpeaker() {
 }
 
 /**
- * Play the cha-ching cash register sound on the Sonos.
- * @param {number} [volume] - 0–100  (defaults to SONOS_VOLUME or 40)
+ * Play an arbitrary MP3 file on the Sonos speaker.
+ * @param {string} mp3AbsPath - absolute path to the .mp3 file
+ * @param {number} [volume] - 0–100  (defaults to SONOS_VOLUME or 20)
  */
-export async function playChaChing(volume) {
+export async function playSound(mp3AbsPath, volume) {
   const vol = volume ?? parseInt(process.env.SONOS_VOLUME || '20', 10);
 
   try {
-    const uri = await ensureSoundServer();
+    await ensureSoundServer();
+    const filename = registerSound(mp3AbsPath);
+    const uri = `${soundServerBase}/${encodeURIComponent(filename)}`;
     const speaker = await getSpeaker();
 
     await speaker.playNotification({
@@ -98,12 +115,20 @@ export async function playChaChing(volume) {
       volume: vol,
     });
 
-    console.log('   💰 Cha-ching played ✓');
+    console.log(`   🔊 Sound played ✓ (${filename})`);
     return true;
   } catch (err) {
-    console.error('   ⚠️  Sonos cha-ching failed:', err.message);
+    console.error('   ⚠️  Sonos playSound failed:', err.message);
     return false;
   }
+}
+
+/**
+ * Play the cha-ching cash register sound on the Sonos.
+ * @param {number} [volume] - 0–100  (defaults to SONOS_VOLUME or 20)
+ */
+export async function playChaChing(volume) {
+  return playSound(path.join(__dirname, 'cha-ching.mp3'), volume);
 }
 
 /**
