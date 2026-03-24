@@ -38,33 +38,50 @@ function getLocalIP() {
 async function ensureSoundServer() {
   if (soundServerBase) return soundServerBase;
 
-  const port = parseInt(process.env.SONOS_SOUND_PORT || '5089', 10);
+  const preferredPort = parseInt(process.env.SONOS_SOUND_PORT || '5089', 10);
 
-  return new Promise((resolve, reject) => {
-    const server = http.createServer((req, res) => {
-      const filename = decodeURIComponent(path.basename(req.url));
-      const buffer = soundFiles.get(filename);
-      if (!buffer) {
-        res.writeHead(404);
-        res.end('Not found');
-        return;
-      }
-      console.log(`   >> Sonos fetched ${req.url} from ${req.socket.remoteAddress}`);
-      res.writeHead(200, {
-        'Content-Type': 'audio/mpeg',
-        'Content-Length': buffer.length,
-      });
-      res.end(buffer);
+  const server = http.createServer((req, res) => {
+    const filename = decodeURIComponent(path.basename(req.url));
+    const buffer = soundFiles.get(filename);
+    if (!buffer) {
+      res.writeHead(404);
+      res.end('Not found');
+      return;
+    }
+    console.log(`   >> Sonos fetched ${req.url} from ${req.socket.remoteAddress}`);
+    res.writeHead(200, {
+      'Content-Type': 'audio/mpeg',
+      'Content-Length': buffer.length,
     });
-
-    server.on('error', reject);
-    server.listen(port, '0.0.0.0', () => {
-      const ip = process.env.SONOS_CALLBACK_IP || getLocalIP();
-      soundServerBase = `http://${ip}:${port}`;
-      console.log(`🔊 Sound server listening → ${soundServerBase}`);
-      resolve(soundServerBase);
-    });
+    res.end(buffer);
   });
+
+  function listen(port) {
+    return new Promise((resolve, reject) => {
+      server.once('error', reject);
+      server.listen(port, '0.0.0.0', () => {
+        server.removeListener('error', reject);
+        resolve(server.address().port);
+      });
+    });
+  }
+
+  let actualPort;
+  try {
+    actualPort = await listen(preferredPort);
+  } catch (err) {
+    if (err.code === 'EADDRINUSE') {
+      console.log(`   ⚠️  Port ${preferredPort} in use, picking a free port…`);
+      actualPort = await listen(0);
+    } else {
+      throw err;
+    }
+  }
+
+  const ip = process.env.SONOS_CALLBACK_IP || getLocalIP();
+  soundServerBase = `http://${ip}:${actualPort}`;
+  console.log(`🔊 Sound server listening → ${soundServerBase}`);
+  return soundServerBase;
 }
 
 function registerSound(mp3AbsPath) {
