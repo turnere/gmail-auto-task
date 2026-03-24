@@ -119,6 +119,7 @@ async function fetchWatchedEmails(auth, afterTimestamp) {
         subject: getHeader('Subject'),
         from: getHeader('From'),
         date: getHeader('Date'),
+        inReplyTo: getHeader('In-Reply-To'),
         body: extractBody(msg.payload).slice(0, 10_000),
       });
     }
@@ -132,6 +133,14 @@ async function fetchWatchedEmails(auth, afterTimestamp) {
  */
 async function processEmail(email) {
   processedIds.add(email.id);
+
+  // Skip replies — only alert on initial/new emails
+  if (email.inReplyTo) {
+    console.log(`\n📨 Reply from: ${email.from}`);
+    console.log(`   Subject: ${email.subject}`);
+    console.log(`   ↩️  Skipping reply (In-Reply-To header present)`);
+    return { alerted: false, result: null };
+  }
 
   console.log(`\n📨 New email from: ${email.from}`);
   console.log(`   Subject: ${email.subject}`);
