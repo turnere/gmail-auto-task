@@ -1,0 +1,54 @@
+# Home Assistant automations for PawSync.
+# Add these to your automations.yaml or via the HA UI.
+
+# ─── Sync schedule when the input_text changes ──────────────────────────────
+
+- id: pawsync_sync_schedule
+  alias: "PawSync – Sync schedule to API"
+  description: >
+    When you change the feed times or volume in the HA UI, push the
+    new schedule to the PawSync API.
+  trigger:
+    - platform: state
+      entity_id: input_text.pawsync_feed_times
+    - platform: state
+      entity_id: input_number.pawsync_chime_volume
+  condition:
+    - condition: state
+      entity_id: input_boolean.pawsync_enabled
+      state: "on"
+  action:
+    - service: rest_command.pawsync_update_schedule
+      data:
+        times: >-
+          {{ states('input_text.pawsync_feed_times').split(',')
+             | map('trim') | list | tojson }}
+        volume: "{{ states('input_number.pawsync_chime_volume') | int }}"
+
+# ─── Play chime on demand via a button ──────────────────────────────────────
+
+- id: pawsync_manual_chime
+  alias: "PawSync – Manual chime"
+  description: "Trigger the feeder triangle chime immediately."
+  trigger: []                    # call via service or button
+  action:
+    - service: rest_command.pawsync_play_chime
+
+# ─── Alert if the PawSync API goes offline ──────────────────────────────────
+
+- id: pawsync_offline_alert
+  alias: "PawSync – API offline alert"
+  trigger:
+    - platform: state
+      entity_id: sensor.pawsync_api_status
+      to: "unavailable"
+      for:
+        minutes: 5
+  action:
+    - service: persistent_notification.create
+      data:
+        title: "PawSync Offline"
+        message: >
+          The PawSync API has been unreachable for 5 minutes.
+          Check the Raspberry Pi and the `npm run api` process.
+        notification_id: pawsync_offline

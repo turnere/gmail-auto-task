@@ -1,0 +1,79 @@
+# Home Assistant configuration for PawSync + Sonos integration.
+#
+# Copy the relevant sections into your HA configuration.yaml
+# (usually at /config/configuration.yaml in the HA container).
+#
+# Replace YOUR_PI_IP with the Raspberry Pi's local IP address,
+# and YOUR_API_TOKEN with the same value you set in .env as API_TOKEN.
+
+# ─── REST Sensors ────────────────────────────────────────────────────────────
+
+rest:
+  - resource: "http://YOUR_PI_IP:3000/api/feeder/schedule"
+    scan_interval: 300            # poll every 5 minutes
+    headers:
+      Authorization: "Bearer YOUR_API_TOKEN"
+    sensor:
+      - name: "PawSync Feed Times"
+        value_template: "{{ value_json.times | join(', ') }}"
+        unique_id: pawsync_feed_times
+      - name: "PawSync Volume"
+        value_template: "{{ value_json.volume }}"
+        unique_id: pawsync_volume
+        unit_of_measurement: "%"
+
+  - resource: "http://YOUR_PI_IP:3000/api/health"
+    scan_interval: 60
+    sensor:
+      - name: "PawSync API Status"
+        value_template: "{{ value_json.status }}"
+        unique_id: pawsync_api_status
+
+# ─── REST Commands ───────────────────────────────────────────────────────────
+
+rest_command:
+  pawsync_play_chime:
+    url: "http://YOUR_PI_IP:3000/api/feeder/chime"
+    method: POST
+    headers:
+      Authorization: "Bearer YOUR_API_TOKEN"
+    content_type: "application/json"
+
+  pawsync_play_chaching:
+    url: "http://YOUR_PI_IP:3000/api/sonos/chaching"
+    method: POST
+    headers:
+      Authorization: "Bearer YOUR_API_TOKEN"
+      Content-Type: "application/json"
+    payload: '{"volume": {{ volume | default(20) }}}'
+
+  pawsync_update_schedule:
+    url: "http://YOUR_PI_IP:3000/api/feeder/schedule"
+    method: PUT
+    headers:
+      Authorization: "Bearer YOUR_API_TOKEN"
+      Content-Type: "application/json"
+    payload: '{"times": {{ times }}, "volume": {{ volume | default(30) }}}'
+
+# ─── Input helpers (UI controls) ────────────────────────────────────────────
+
+input_number:
+  pawsync_chime_volume:
+    name: "PawSync Chime Volume"
+    min: 0
+    max: 100
+    step: 5
+    initial: 30
+    unit_of_measurement: "%"
+    icon: mdi:volume-high
+
+input_boolean:
+  pawsync_enabled:
+    name: "PawSync Enabled"
+    icon: mdi:cat
+
+input_text:
+  pawsync_feed_times:
+    name: "PawSync Feed Times"
+    initial: "05:00,06:00,07:00,14:00,15:00,16:00,17:00,18:00"
+    icon: mdi:clock-outline

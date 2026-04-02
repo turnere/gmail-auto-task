@@ -1,0 +1,42 @@
+# Home Assistant scripts for PawSync.
+# Add these to your scripts.yaml or via the HA UI.
+
+pawsync_feed_now:
+  alias: "PawSync – Feed chime now"
+  icon: mdi:cat
+  sequence:
+    - service: rest_command.pawsync_play_chime
+
+pawsync_chaching:
+  alias: "PawSync – Cha-ching alert"
+  icon: mdi:cash-register
+  fields:
+    volume:
+      description: "Playback volume (0–100)"
+      example: 20
+  sequence:
+    - service: rest_command.pawsync_play_chaching
+      data:
+        volume: "{{ volume | default(20) }}"
+
+pawsync_set_schedule:
+  alias: "PawSync – Set feed schedule"
+  icon: mdi:calendar-clock
+  fields:
+    times:
+      description: 'Comma-separated times, e.g. "06:00,14:00,18:00"'
+      example: "06:00,14:00,18:00"
+    volume:
+      description: "Chime volume (0–100)"
+      example: 30
+  sequence:
+    - service: input_text.set_value
+      target:
+        entity_id: input_text.pawsync_feed_times
+      data:
+        value: "{{ times }}"
+    - service: input_number.set_value
+      target:
+        entity_id: input_number.pawsync_chime_volume
+      data:
+        value: "{{ volume | default(30) }}"

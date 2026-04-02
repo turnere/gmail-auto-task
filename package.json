@@ -9,6 +9,7 @@
     "auth": "node src/auth.js",
     "leads": "node src/leadMonitor.js",
     "feeder": "node src/catFeeder.js",
+    "api": "node src/api.js",
     "test": "node --test src/**/*.test.js"
   },
   "dependencies": {

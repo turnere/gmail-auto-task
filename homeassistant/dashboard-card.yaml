@@ -1,0 +1,53 @@
+type: vertical-stack
+title: "🐱 PawSync"
+cards:
+  - type: entities
+    title: "Status"
+    entities:
+      - entity: sensor.pawsync_api_status
+      - entity: sensor.pawsync_feed_times
+      - entity: sensor.pawsync_volume
+
+  - type: entities
+    title: "🌅 Morning Feeds"
+    entities:
+      - entity: input_boolean.pawsync_feed_0500
+        name: "5:00 AM"
+      - entity: input_boolean.pawsync_feed_0600
+        name: "6:00 AM"
+      - entity: input_boolean.pawsync_feed_0700
+        name: "7:00 AM"
+
+  - type: entities
+    title: "🌇 Afternoon / Evening Feeds"
+    entities:
+      - entity: input_boolean.pawsync_feed_1400
+        name: "2:00 PM"
+      - entity: input_boolean.pawsync_feed_1500
+        name: "3:00 PM"
+      - entity: input_boolean.pawsync_feed_1600
+        name: "4:00 PM"
+      - entity: input_boolean.pawsync_feed_1700
+        name: "5:00 PM"
+      - entity: input_boolean.pawsync_feed_1800
+        name: "6:00 PM"
+
+  - type: entities
+    title: "🔊 Volume"
+    entities:
+      - entity: input_number.pawsync_chime_volume
+
+  - type: horizontal-stack
+    cards:
+      - type: button
+        name: "Feed Chime"
+        icon: mdi:cat
+        tap_action:
+          action: perform-action
+          perform_action: script.pawsync_feed_now
+      - type: button
+        name: "Cha-Ching"
+        icon: mdi:cash-register
+        tap_action:
+          action: perform-action
+          perform_action: script.pawsync_chaching
