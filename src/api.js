@@ -112,18 +112,18 @@ async function handleRequest(req, res) {
     return json(res, 200, schedule);
   }
 
-  // -- Play feeder chime now -------------------------------------------------
+  // -- Play feeder chime now (fire-and-forget) --------------------------------
   if (route === '/api/feeder/chime' && method === 'POST') {
-    const ok = await playFeederChime();
-    return json(res, ok ? 200 : 502, { played: ok });
+    playFeederChime().catch(err => console.error('Feeder chime error:', err.message));
+    return json(res, 200, { triggered: true });
   }
 
-  // -- Sonos controls --------------------------------------------------------
+  // -- Sonos controls (fire-and-forget) ---------------------------------------
   if (route === '/api/sonos/chaching' && method === 'POST') {
     const body = await readBody(req);
     const { volume } = body ? JSON.parse(body || '{}') : {};
-    const ok = await playChaChing(volume);
-    return json(res, ok ? 200 : 502, { played: ok });
+    playChaChing(volume).catch(err => console.error('Cha-ching error:', err.message));
+    return json(res, 200, { triggered: true });
   }
 
   // -- 404 -------------------------------------------------------------------
