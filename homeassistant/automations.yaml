@@ -1,6 +1,45 @@
 # Home Assistant automations for PawSync.
 # Add these to your automations.yaml or via the HA UI.
 
+# ─── Sync toggle switches → input_text feed times ───────────────────────────
+
+- id: pawsync_sync_toggles_to_times
+  alias: "PawSync – Sync toggle switches to feed times"
+  description: >
+    When any individual feed-time toggle changes, rebuild the
+    input_text.pawsync_feed_times string from the enabled toggles.
+  trigger:
+    - platform: state
+      entity_id:
+        - input_boolean.pawsync_feed_0500
+        - input_boolean.pawsync_feed_0600
+        - input_boolean.pawsync_feed_0700
+        - input_boolean.pawsync_feed_1400
+        - input_boolean.pawsync_feed_1500
+        - input_boolean.pawsync_feed_1600
+        - input_boolean.pawsync_feed_1700
+        - input_boolean.pawsync_feed_1800
+  condition:
+    - condition: state
+      entity_id: input_boolean.pawsync_enabled
+      state: "on"
+  action:
+    - service: input_text.set_value
+      target:
+        entity_id: input_text.pawsync_feed_times
+      data:
+        value: >-
+          {% set times = [] %}
+          {% if is_state('input_boolean.pawsync_feed_0500', 'on') %}{% set times = times + ['05:00'] %}{% endif %}
+          {% if is_state('input_boolean.pawsync_feed_0600', 'on') %}{% set times = times + ['06:00'] %}{% endif %}
+          {% if is_state('input_boolean.pawsync_feed_0700', 'on') %}{% set times = times + ['07:00'] %}{% endif %}
+          {% if is_state('input_boolean.pawsync_feed_1400', 'on') %}{% set times = times + ['14:00'] %}{% endif %}
+          {% if is_state('input_boolean.pawsync_feed_1500', 'on') %}{% set times = times + ['15:00'] %}{% endif %}
+          {% if is_state('input_boolean.pawsync_feed_1600', 'on') %}{% set times = times + ['16:00'] %}{% endif %}
+          {% if is_state('input_boolean.pawsync_feed_1700', 'on') %}{% set times = times + ['17:00'] %}{% endif %}
+          {% if is_state('input_boolean.pawsync_feed_1800', 'on') %}{% set times = times + ['18:00'] %}{% endif %}
+          {{ times | join(',') }}
+
 # ─── Sync schedule when the input_text changes ──────────────────────────────
 
 - id: pawsync_sync_schedule

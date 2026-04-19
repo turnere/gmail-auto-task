@@ -8,7 +8,7 @@ import 'dotenv/config';
 import { getAuthClient } from './googleClient.js';
 import { fetchSentEmails } from './gmail.js';
 import { extractCommitments } from './extractor.js';
-import { createHabiticaTasks } from './habitica.js';
+import { getExistingTodos, syncHabiticaTasks } from './habitica.js';
 
 async function main() {
   const startTime = Date.now();
@@ -33,42 +33,59 @@ async function main() {
     return;
   }
 
-  // 3. Extract commitments from each email
-  console.log(`\n🤖 Analyzing ${emails.length} email(s) with Claude (${model})...\n`);
+  // 3. Fetch existing Habitica todos so Claude can deduplicate
+  console.log('\n📋 Fetching existing Habitica todos...');
+  const existingTasks = await getExistingTodos();
+  console.log(`   Found ${existingTasks.length} existing todo(s)\n`);
 
-  let totalTasks = 0;
+  // 4. Extract commitments from each email
+  console.log(`🤖 Analyzing ${emails.length} email(s) with Claude (${model})...\n`);
+
+  let totalCreated = 0;
+  let totalUpdated = 0;
   const allTasks = [];
 
   for (const email of emails) {
     console.log(`📨 "${email.subject}" → ${email.to}`);
-    const tasks = await extractCommitments(email, model);
+    const tasks = await extractCommitments(email, existingTasks, model);
 
-    if (tasks.length === 0) {
+    const actionable = tasks.filter(t => t.action !== 'none');
+    const skipped = tasks.filter(t => t.action === 'none');
+
+    if (actionable.length === 0 && skipped.length === 0) {
       console.log('   No commitments found.\n');
     } else {
-      console.log(`   Found ${tasks.length} commitment(s):`);
-      for (const t of tasks) {
-        console.log(`     • ${t.title}`);
-        // Add email context to notes
-        t.notes = `From email: "${email.subject}" to ${email.to}\n${t.notes || ''}`.trim();
+      if (actionable.length > 0) {
+        console.log(`   Found ${actionable.length} commitment(s):`);
+        for (const t of actionable) {
+          const verb = t.action === 'update' ? '✏️  update' : '➕ create';
+          console.log(`     • [${verb}] ${t.title}`);
+          t.notes = `From email: "${email.subject}" to ${email.to}\n${t.notes || ''}`.trim();
+        }
       }
-      allTasks.push(...tasks);
+      if (skipped.length > 0) {
+        console.log(`   Skipped ${skipped.length} (already covered by existing tasks)`);
+      }
+      allTasks.push(...actionable);
       console.log('');
     }
   }
 
-  // 4. Create todos in Habitica (with reminders)
+  // 5. Sync todos to Habitica (create new + update existing)
   if (allTasks.length > 0) {
-    console.log(`\n📋 Creating ${allTasks.length} todo(s) in Habitica...\n`);
-    totalTasks = await createHabiticaTasks(allTasks, dryRun);
+    console.log(`\n📋 Syncing ${allTasks.length} todo(s) to Habitica...\n`);
+    const result = await syncHabiticaTasks(allTasks, dryRun);
+    totalCreated = result.created;
+    totalUpdated = result.updated;
   }
 
-  // 5. Summary
+  // 6. Summary
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
   console.log('\n' + '─'.repeat(50));
   console.log(`✅ Done in ${elapsed}s`);
   console.log(`   📧 Emails scanned: ${emails.length}`);
-  console.log(`   📋 Tasks created: ${totalTasks}`);
+  console.log(`   📋 Tasks created: ${totalCreated}`);
+  console.log(`   ✏️  Tasks updated: ${totalUpdated}`);
   if (dryRun) console.log('   ⚠️  (dry run — nothing was actually created)');
   console.log('');
 }

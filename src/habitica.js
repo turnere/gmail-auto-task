@@ -154,36 +154,119 @@ export async function deleteHabiticaTask(taskId) {
 }
 
 /**
- * Create multiple Habitica todos, logging progress.
- * 
- * @param {Array<{title: string, notes: string, dueDate: string}>} tasks
- * @param {boolean} dryRun - If true, just log without creating
- * @returns {Promise<number>} number of tasks created
+ * Fetch all incomplete todos from Habitica, optionally filtered by tag.
+ * @returns {Promise<Array<{id: string, text: string, notes: string, date: string, tags: string[]}>>}
  */
-export async function createHabiticaTasks(tasks, dryRun = false) {
-  if (tasks.length === 0) {
-    console.log('   No tasks to create.');
-    return 0;
+export async function getExistingTodos() {
+  const res = await fetch(`${HABITICA_BASE}/tasks/user?type=todos`, {
+    headers: getHeaders(),
+  });
+
+  if (!res.ok) {
+    console.warn('   ⚠️  Could not fetch existing todos');
+    return [];
+  }
+
+  const { data: todos } = await res.json();
+
+  // Filter to our tag if we have one
+  const tagId = await getOrCreateTag();
+  const filtered = tagId
+    ? todos.filter(t => t.tags?.includes(tagId))
+    : todos;
+
+  return filtered.map(t => ({
+    id: t.id,
+    title: t.text,
+    notes: t.notes || '',
+    dueDate: t.date ? t.date.split('T')[0] : null,
+  }));
+}
+
+/**
+ * Update an existing Habitica task.
+ * Only sends fields that are provided.
+ *
+ * @param {string} taskId
+ * @param {object} updates - { title?, notes?, dueDate? }
+ * @returns {Promise<object>} updated task data
+ */
+export async function updateHabiticaTask(taskId, updates) {
+  const body = {};
+  if (updates.title) body.text = updates.title;
+  if (updates.notes) body.notes = updates.notes;
+  if (updates.dueDate) body.date = updates.dueDate;
+
+  const res = await fetch(`${HABITICA_BASE}/tasks/${taskId}`, {
+    method: 'PUT',
+    headers: getHeaders(),
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(`Habitica update error ${res.status}: ${err.message || res.statusText}`);
+  }
+
+  const data = await res.json();
+  return data.data;
+}
+
+/**
+ * Sync tasks to Habitica — creates new todos or updates existing ones.
+ * 
+ * Each task object should have:
+ *   - action: "create" | "update" | "none"
+ *   - existingTaskId?: string (required for "update")
+ *   - title, notes, dueDate
+ * 
+ * @param {Array<{action: string, existingTaskId?: string, title: string, notes: string, dueDate: string}>} tasks
+ * @param {boolean} dryRun
+ * @returns {Promise<{created: number, updated: number}>}
+ */
+export async function syncHabiticaTasks(tasks, dryRun = false) {
+  const actionable = tasks.filter(t => t.action !== 'none');
+
+  if (actionable.length === 0) {
+    console.log('   No tasks to create or update.');
+    return { created: 0, updated: 0 };
   }
 
   let created = 0;
+  let updated = 0;
 
-  for (const task of tasks) {
-    if (dryRun) {
-      console.log(`   [DRY RUN] Would create: "${task.title}" (due ${task.dueDate || 'none'})`);
-      created++;
-      continue;
-    }
+  for (const task of actionable) {
+    if (task.action === 'update' && task.existingTaskId) {
+      if (dryRun) {
+        console.log(`   [DRY RUN] Would update: "${task.title}" (due ${task.dueDate || 'none'})`);
+        updated++;
+        continue;
+      }
 
-    try {
-      const result = await createHabiticaTask(task);
-      const reminderInfo = result.reminders?.length ? ' with reminder' : '';
-      console.log(`   ✅ Created: "${task.title}" (due ${task.dueDate || 'none'})${reminderInfo}`);
-      created++;
-    } catch (err) {
-      console.error(`   ❌ Failed to create "${task.title}":`, err.message);
+      try {
+        await updateHabiticaTask(task.existingTaskId, task);
+        console.log(`   ✏️  Updated: "${task.title}" (due ${task.dueDate || 'none'})`);
+        updated++;
+      } catch (err) {
+        console.error(`   ❌ Failed to update "${task.title}":`, err.message);
+      }
+    } else {
+      if (dryRun) {
+        console.log(`   [DRY RUN] Would create: "${task.title}" (due ${task.dueDate || 'none'})`);
+        created++;
+        continue;
+      }
+
+      try {
+        const result = await createHabiticaTask(task);
+        const reminderInfo = result.reminders?.length ? ' with reminder' : '';
+        console.log(`   ✅ Created: "${task.title}" (due ${task.dueDate || 'none'})${reminderInfo}`);
+        created++;
+      } catch (err) {
+        console.error(`   ❌ Failed to create "${task.title}":`, err.message);
+      }
     }
   }
 
-  return created;
+  return { created, updated };
 }

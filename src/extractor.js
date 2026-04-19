@@ -8,6 +8,11 @@ const client = new Anthropic(); // reads ANTHROPIC_API_KEY from env
 
 const SYSTEM_PROMPT = `You are an executive assistant analyzing sent emails to extract commitments, promises, and action items that the sender (your boss) made.
 
+You will also be given a list of EXISTING TASKS. Use these to avoid duplicates:
+- If an email commitment matches an existing task, decide whether the existing task needs updating (e.g., new due date, more context in notes, clearer title). If so, return an "update" action referencing the existing task's ID.
+- If an existing task already covers the commitment and nothing has changed, return action "none" for it.
+- Only return action "create" for genuinely new commitments not covered by existing tasks.
+
 Rules:
 - Only extract things the SENDER committed to doing (not things they asked others to do)
 - Do NOT create tasks for things where the ball is in the OTHER person's court. If the sender proposed options, offered dates, asked a question, or is waiting for a reply — that is NOT a task. The other person will respond or they won't.
@@ -22,6 +27,8 @@ Respond with ONLY valid JSON, no markdown fences. Use this exact schema:
 {
   "tasks": [
     {
+      "action": "create" | "update" | "none",
+      "existingTaskId": "only for update/none — the ID of the matched existing task",
       "title": "Short actionable task description",
       "notes": "Context from the email (who it's for, what was discussed)",
       "dueDate": "YYYY-MM-DD"
@@ -31,10 +38,21 @@ Respond with ONLY valid JSON, no markdown fences. Use this exact schema:
 
 /**
  * @param {object} email - { subject, to, date, body }
+ * @param {Array<{id: string, title: string, notes: string, dueDate: string}>} existingTasks
  * @param {string} model - Claude model to use
- * @returns {Promise<Array<{title: string, notes: string, dueDate: string}>>}
+ * @returns {Promise<Array<{action: string, existingTaskId?: string, title: string, notes: string, dueDate: string}>>}
  */
-export async function extractCommitments(email, model = 'claude-sonnet-4-20250514') {
+export async function extractCommitments(email, existingTasks = [], model = 'claude-sonnet-4-20250514') {
+  let existingTasksBlock = '';
+  if (existingTasks.length > 0) {
+    const taskList = existingTasks.map(t =>
+      `- ID: ${t.id} | Title: "${t.title}" | Due: ${t.dueDate || 'none'} | Notes: ${t.notes || 'none'}`
+    ).join('\n');
+    existingTasksBlock = `\n\nEXISTING TASKS:\n${taskList}`;
+  } else {
+    existingTasksBlock = '\n\nEXISTING TASKS: (none)';
+  }
+
   const userMessage = `Analyze this sent email for commitments I made:
 
 To: ${email.to}
@@ -45,9 +63,9 @@ Date: ${email.date}
 ${email.body}
 ---
 
-Today's date: ${new Date().toISOString().split('T')[0]}
+Today's date: ${new Date().toISOString().split('T')[0]}${existingTasksBlock}
 
-Extract any commitments or action items I made in this email.`;
+Extract any commitments or action items I made in this email. If a commitment matches an existing task, use action "update" (with the existing task's ID) if details changed, or "none" if nothing needs updating. Use action "create" only for new commitments.`;
 
   try {
     const response = await client.messages.create({

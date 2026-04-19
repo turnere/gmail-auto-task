@@ -3,16 +3,17 @@
 # Copy the relevant sections into your HA configuration.yaml
 # (usually at /config/configuration.yaml in the HA container).
 #
-# Replace YOUR_PI_IP with the Raspberry Pi's local IP address,
-# and YOUR_API_TOKEN with the same value you set in .env as API_TOKEN.
+# Replace the IP and token below if they change.
+#   Pi IP:     192.168.5.112
+#   API Token: set in .env as API_TOKEN
 
 # ─── REST Sensors ────────────────────────────────────────────────────────────
 
 rest:
-  - resource: "http://YOUR_PI_IP:3000/api/feeder/schedule"
+  - resource: "http://192.168.5.112:3000/api/feeder/schedule"
     scan_interval: 300            # poll every 5 minutes
     headers:
-      Authorization: "Bearer YOUR_API_TOKEN"
+      Authorization: "Bearer 7188677562c25d709f8c874140d9286ff7e9e9588f60035d44ea13a325cb32e7"
     sensor:
       - name: "PawSync Feed Times"
         value_template: "{{ value_json.times | join(', ') }}"
@@ -22,7 +23,7 @@ rest:
         unique_id: pawsync_volume
         unit_of_measurement: "%"
 
-  - resource: "http://YOUR_PI_IP:3000/api/health"
+  - resource: "http://192.168.5.112:3000/api/health"
     scan_interval: 60
     sensor:
       - name: "PawSync API Status"
@@ -33,25 +34,25 @@ rest:
 
 rest_command:
   pawsync_play_chime:
-    url: "http://YOUR_PI_IP:3000/api/feeder/chime"
+    url: "http://192.168.5.112:3000/api/feeder/chime"
     method: POST
     headers:
-      Authorization: "Bearer YOUR_API_TOKEN"
+      Authorization: "Bearer 7188677562c25d709f8c874140d9286ff7e9e9588f60035d44ea13a325cb32e7"
     content_type: "application/json"
 
   pawsync_play_chaching:
-    url: "http://YOUR_PI_IP:3000/api/sonos/chaching"
+    url: "http://192.168.5.112:3000/api/sonos/chaching"
     method: POST
     headers:
-      Authorization: "Bearer YOUR_API_TOKEN"
+      Authorization: "Bearer 7188677562c25d709f8c874140d9286ff7e9e9588f60035d44ea13a325cb32e7"
       Content-Type: "application/json"
     payload: '{"volume": {{ volume | default(20) }}}'
 
   pawsync_update_schedule:
-    url: "http://YOUR_PI_IP:3000/api/feeder/schedule"
+    url: "http://192.168.5.112:3000/api/feeder/schedule"
     method: PUT
     headers:
-      Authorization: "Bearer YOUR_API_TOKEN"
+      Authorization: "Bearer 7188677562c25d709f8c874140d9286ff7e9e9588f60035d44ea13a325cb32e7"
       Content-Type: "application/json"
     payload: '{"times": {{ times }}, "volume": {{ volume | default(30) }}}'
 
@@ -71,6 +72,38 @@ input_boolean:
   pawsync_enabled:
     name: "PawSync Enabled"
     icon: mdi:cat
+  pawsync_feed_0500:
+    name: "PawSync Feed 05:00"
+    initial: true
+    icon: mdi:clock-outline
+  pawsync_feed_0600:
+    name: "PawSync Feed 06:00"
+    initial: true
+    icon: mdi:clock-outline
+  pawsync_feed_0700:
+    name: "PawSync Feed 07:00"
+    initial: true
+    icon: mdi:clock-outline
+  pawsync_feed_1400:
+    name: "PawSync Feed 14:00"
+    initial: true
+    icon: mdi:clock-outline
+  pawsync_feed_1500:
+    name: "PawSync Feed 15:00"
+    initial: true
+    icon: mdi:clock-outline
+  pawsync_feed_1600:
+    name: "PawSync Feed 16:00"
+    initial: true
+    icon: mdi:clock-outline
+  pawsync_feed_1700:
+    name: "PawSync Feed 17:00"
+    initial: true
+    icon: mdi:clock-outline
+  pawsync_feed_1800:
+    name: "PawSync Feed 18:00"
+    initial: true
+    icon: mdi:clock-outline
 
 input_text:
   pawsync_feed_times:
