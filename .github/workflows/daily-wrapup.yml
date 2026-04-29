@@ -1,0 +1,36 @@
+name: Daily Wrap-up Push
+
+on:
+  schedule:
+    # 8:30 AM Central (CDT = 13:30 UTC; CST winter = 14:30 UTC, adjust then).
+    # Runs ~30 min after daily-scan so newly-created todos are picked up.
+    - cron: '30 13 * * *'
+  workflow_dispatch:
+
+jobs:
+  send-wrapup:
+    runs-on: ubuntu-latest
+
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Send wrap-up push
+        env:
+          HABITICA_USER_ID: ${{ secrets.HABITICA_USER_ID }}
+          HABITICA_API_TOKEN: ${{ secrets.HABITICA_API_TOKEN }}
+          HABITICA_TAG: 'Photography'
+          PUSHOVER_USER_KEY: ${{ secrets.PUSHOVER_USER_KEY }}
+          PUSHOVER_API_TOKEN: ${{ secrets.PUSHOVER_API_TOKEN }}
+          # Window must cover the gap between daily-scan and this job + buffer
+          WRAPUP_HOURS: '2'
+        run: npm run wrapup

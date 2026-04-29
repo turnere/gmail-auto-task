@@ -180,6 +180,7 @@ export async function getExistingTodos() {
     title: t.text,
     notes: t.notes || '',
     dueDate: t.date ? t.date.split('T')[0] : null,
+    createdAt: t.createdAt || null,
   }));
 }
 

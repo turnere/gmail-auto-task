@@ -7,6 +7,8 @@
   "scripts": {
     "start": "node src/index.js",
     "auth": "node src/auth.js",
+    "digest": "node src/digest.js",
+    "wrapup": "node src/wrapup.js",
     "leads": "node src/leadMonitor.js",
     "feeder": "node src/catFeeder.js",
     "api": "node src/api.js",
