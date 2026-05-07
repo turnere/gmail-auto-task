@@ -21,6 +21,7 @@ import {
   parseFeedTimes,
 } from './catFeeder.js';
 import { playSound, playChaChing } from './sonos.js';
+import { parseShowitInquiry } from './showit.js';
 
 const PORT = parseInt(process.env.API_PORT || '3000', 10);
 const API_TOKEN = process.env.API_TOKEN;
@@ -126,6 +127,20 @@ async function handleRequest(req, res) {
     return json(res, 200, { triggered: true });
   }
 
+  // -- Showit form inquiry parser -------------------------------------------
+  if (route === '/api/showit/parse' && method === 'POST') {
+    const body = JSON.parse(await readBody(req));
+    if (!body.email_body || typeof body.email_body !== 'string') {
+      return json(res, 400, { error: 'email_body (string) is required' });
+    }
+    const inquiry = await parseShowitInquiry(
+      body.email_body,
+      body.email_subject || '',
+      body.model,
+    );
+    return json(res, 200, inquiry);
+  }
+
   // -- 404 -------------------------------------------------------------------
   json(res, 404, { error: 'Not found' });
 }
@@ -154,5 +169,6 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`     PUT  /api/feeder/schedule    — update schedule {times[], volume?}`);
   console.log(`     POST /api/feeder/chime       — play feeder chime now`);
   console.log(`     POST /api/sonos/chaching     — play cha-ching sound`);
+  console.log(`     POST /api/showit/parse       — parse Showit inquiry email → HoneyBook JSON`);
   console.log('');
 });

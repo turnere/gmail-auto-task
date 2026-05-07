@@ -10,6 +10,7 @@
     "digest": "node src/digest.js",
     "wrapup": "node src/wrapup.js",
     "leads": "node src/leadMonitor.js",
+    "showit": "node src/showitMonitor.js",
     "feeder": "node src/catFeeder.js",
     "api": "node src/api.js",
     "test": "node --test src/**/*.test.js"

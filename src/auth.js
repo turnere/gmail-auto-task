@@ -15,6 +15,7 @@ import { exec } from 'child_process';
 const SCOPES = [
   'https://www.googleapis.com/auth/gmail.readonly',
   'https://www.googleapis.com/auth/tasks',
+  'https://www.googleapis.com/auth/spreadsheets',
 ];
 
 const TOKEN_PATH = 'token.json';
