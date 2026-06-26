@@ -33,4 +33,5 @@ jobs:
           HABITICA_TAG: 'Photography'
           HOURS_TO_LOOK_BACK: '24'
           CLAUDE_MODEL: 'claude-haiku-4-5-20251001'
+          NODE_OPTIONS: '--dns-result-order=ipv4first'
         run: npm start
