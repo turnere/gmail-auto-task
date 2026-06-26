@@ -77,9 +77,10 @@ Extract any commitments or action items I made in this email. If a commitment ma
 
     const text = response.content[0]?.text || '{"tasks": []}';
 
-    // Parse JSON (strip markdown fences if Claude adds them despite instructions)
-    const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-    const parsed = JSON.parse(cleaned);
+    // Extract the JSON object, tolerating markdown fences or surrounding prose
+    const match = text.match(/\{[\s\S]*\}/);
+    if (!match) return [];
+    const parsed = JSON.parse(match[0]);
 
     return parsed.tasks || [];
   } catch (err) {
