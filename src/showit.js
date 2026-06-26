@@ -42,7 +42,7 @@ Use this exact schema (use null for any field not found):
   "guest_count": "number or range as stated, or null",
   "package_interest": "brief description of what they want, or null",
   "budget": "stated budget or null",
-  "referral_source": "value of the Referral field, or null",
+  "referral_source": "normalized to one of the exact HoneyBook lead source values listed below, or null",
   "submitted_from": "URL from Submitted From field, or null",
   "notes": "full text of their Message field, preserved as-is"
 }
@@ -54,7 +54,18 @@ Rules:
 - Infer event_type from venue name, partner name presence, and message content if not explicit.
 - Extract guest_count from the Message if mentioned (e.g. "50-60 person wedding").
 - Preserve the Message field verbatim in notes — do not summarize it.
-- phone: keep the raw digits/formatting as provided, do not reformat.`;
+- phone: keep the raw digits/formatting as provided, do not reformat.
+
+Normalize referral_source to EXACTLY one of these HoneyBook lead source values (case-sensitive):
+  Google | Instagram | Thumbtack | Wedding Wire | Client Referral | Unknown |
+  Personal Website | Facebook | The Knot | Zola | Vendor Referral | Other
+
+Matching rules for referral_source:
+- Match loosely on the raw value (e.g. "zola" → "Zola", "google" → "Google", "ig" → "Instagram",
+  "weddingwire" → "Wedding Wire", "the knot" → "The Knot", "word of mouth" → "Client Referral",
+  "friend" → "Client Referral", "vendor" → "Vendor Referral", "website" → "Personal Website").
+- If you cannot confidently match to one of the above, use "Other".
+- If the field is blank or absent, use null.`;
 
 /**
  * @param {string} emailBody     - Raw email text from the Showit form notification
