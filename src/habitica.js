@@ -154,8 +154,10 @@ export async function deleteHabiticaTask(taskId) {
 }
 
 /**
- * Fetch all incomplete todos from Habitica, optionally filtered by tag.
- * @returns {Promise<Array<{id: string, text: string, notes: string, date: string, tags: string[]}>>}
+ * Fetch all incomplete todos from Habitica.
+ * Returns every open todo so Claude can deduplicate against manually-created
+ * tasks regardless of tag.
+ * @returns {Promise<Array<{id: string, title: string, notes: string, dueDate: string|null, createdAt: string|null}>>}
  */
 export async function getExistingTodos() {
   const res = await fetch(`${HABITICA_BASE}/tasks/user?type=todos`, {
@@ -169,19 +171,17 @@ export async function getExistingTodos() {
 
   const { data: todos } = await res.json();
 
-  // Filter to our tag if we have one
-  const tagId = await getOrCreateTag();
-  const filtered = tagId
-    ? todos.filter(t => t.tags?.includes(tagId))
-    : todos;
-
-  return filtered.map(t => ({
-    id: t.id,
-    title: t.text,
-    notes: t.notes || '',
-    dueDate: t.date ? t.date.split('T')[0] : null,
-    createdAt: t.createdAt || null,
-  }));
+  // Include all incomplete todos so Claude can match against manually-created
+  // tasks that may not have the Photography tag
+  return todos
+    .filter(t => !t.completed)
+    .map(t => ({
+      id: t.id,
+      title: t.text,
+      notes: t.notes || '',
+      dueDate: t.date ? t.date.split('T')[0] : null,
+      createdAt: t.createdAt || null,
+    }));
 }
 
 /**
